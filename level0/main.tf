@@ -69,4 +69,22 @@ resource "aws_network_acl" "alf_vpc_nacl" {
 
 # ------------------------------------------------------------------------------
 
-#EOF
+resource "aws_lb" "alf_alb" {
+  name               = "alf-alb"
+  internal           = false
+  load_balancer_type = "application"
+  subnets = [
+    aws_subnet.alf_subnet_a.id,
+    aws_subnet.alf_subnet_b.id,
+  ]
+  tags = var.tags
+}
+
+resource "aws_lb_target_group" "alf_alb_tg" {
+  name        = "alf-alb-tg"
+  target_type = "lambda"
+  tags        = var.tags
+}
+
+# ------------------------------------------------------------------------------
+
