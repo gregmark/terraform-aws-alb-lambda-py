@@ -1,4 +1,4 @@
-# ./vpc.tf
+# ./main.tf
 
 # ------------------------------------------------------------------------------
 
@@ -69,6 +69,39 @@ resource "aws_network_acl" "alf_vpc_nacl" {
 
 # ------------------------------------------------------------------------------
 
+resource "aws_security_group" "alf_alb_sg" {
+  name        = "alf-alb-sg"
+  description = "manage alb network access"
+  vpc_id      = aws_vpc.alf_vpc.id
+  tags        = var.tags
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "alf_alb_sg_rule_ingress" {
+  security_group_id = aws_security_group.alf_alb_sg.id
+  description       = "allow port 80/tcp from internet to alb"
+  type              = "ingress"
+  protocol          = "tcp"
+  from_port         = 80
+  to_port           = 80
+  cidr_blocks       = ["0.0.0.0/0"]
+}
+
+# this is worthless without further specification
+#resource "aws_security_group_rule" "alf_alb_sg_rule_egress" {
+#  security_group_id = aws_security_group.alf_alb_sg.id
+#  description       = "allow all from alb to internet"
+#  type              = "egress"
+#  protocol          = "-1"
+#  from_port         = 0
+#  to_port           = 0
+#  cidr_blocks       = ["0.0.0.0/0"]
+#}
+
+# ------------------------------------------------------------------------------
+
 resource "aws_lb" "alf_alb" {
   name               = "alf-alb"
   internal           = false
@@ -77,7 +110,8 @@ resource "aws_lb" "alf_alb" {
     aws_subnet.alf_subnet_a.id,
     aws_subnet.alf_subnet_b.id,
   ]
-  tags = var.tags
+  security_groups = [aws_security_group.alf_alb_sg.id]
+  tags            = var.tags
 }
 
 resource "aws_lb_target_group" "alf_alb_tg" {
@@ -86,13 +120,27 @@ resource "aws_lb_target_group" "alf_alb_tg" {
   tags        = var.tags
 }
 
+resource "aws_lb_listener" "alf_alb_listener" {
+  load_balancer_arn = aws_lb.alf_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.alf_alb_tg.arn
+  }
+  tags = var.tags
+}
+
 # ------------------------------------------------------------------------------
 
-resource "aws_iam_role" "alf_lambda_iam_role" {
+resource "aws_iam_role" "alf_lambda_exec_role" {
   name               = "alf-lambda-exec-role"
   description        = "Execution role for lambda"
   assume_role_policy = file("${path.module}/files/lambda-execution-role.json")
   tags               = var.tags
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_policy" "alf_lambda_iam_policy" {
@@ -103,8 +151,58 @@ resource "aws_iam_policy" "alf_lambda_iam_policy" {
 
 resource "aws_iam_role_policy_attachment" "alf_lambda_role_polattach" {
   policy_arn = aws_iam_policy.alf_lambda_iam_policy.arn
-  role       = aws_iam_role.alf_lambda_iam_role.name
+  role       = aws_iam_role.alf_lambda_exec_role.name
 }
 
 # ------------------------------------------------------------------------------
 
+resource "aws_security_group" "alf_lambda_sg" {
+  name        = "alf-lambda-sg"
+  description = "manage lambda network access"
+  vpc_id      = aws_vpc.alf_vpc.id
+  tags        = var.tags
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group_rule" "alf_lambda_sg_rule_ingress" {
+  security_group_id        = aws_security_group.alf_lambda_sg.id
+  description              = "allow port 80/tcp to lambda from alb"
+  type                     = "ingress"
+  protocol                 = "tcp"
+  from_port                = 80
+  to_port                  = 80
+  source_security_group_id = aws_security_group.alf_alb_sg.id
+}
+
+# ------------------------------------------------------------------------------
+
+data "archive_file" "alf_lambda_zip" {
+  type        = "zip"
+  source_file = "./files/lambda_function.py"
+  output_path = "./files/lambda_function.zip"
+}
+
+# ------------------------------------------------------------------------------
+
+resource "aws_lambda_function" "alf_lambda_function" {
+  function_name = "alf-lambda-function"
+  role          = aws_iam_role.alf_lambda_exec_role.arn
+  runtime       = "python3.8"
+  filename      = "./files/lambda_function.zip"
+  handler       = "lambda_function.lambda_handler"
+  vpc_config {
+    subnet_ids = [
+      aws_subnet.alf_subnet_a.id,
+      aws_subnet.alf_subnet_b.id,
+    ]
+    security_group_ids = [aws_security_group.alf_lambda_sg.id]
+  }
+  environment {
+    variables = {
+      APP = "lambda_function.py"
+    }
+  }
+  tags = var.tags
+}
