@@ -88,3 +88,23 @@ resource "aws_lb_target_group" "alf_alb_tg" {
 
 # ------------------------------------------------------------------------------
 
+resource "aws_iam_role" "alf_lambda_iam_role" {
+  name               = "alf-lambda-exec-role"
+  description        = "Execution role for lambda"
+  assume_role_policy = file("${path.module}/files/lambda-execution-role.json")
+  tags               = var.tags
+}
+
+resource "aws_iam_policy" "alf_lambda_iam_policy" {
+  name   = "alf_lambda_iam_policy"
+  policy = file("${path.module}/files/lambda-iam-policy.json")
+  tags   = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "alf_lambda_role_polattach" {
+  policy_arn = aws_iam_policy.alf_lambda_iam_policy.arn
+  role       = aws_iam_role.alf_lambda_iam_role.name
+}
+
+# ------------------------------------------------------------------------------
+
