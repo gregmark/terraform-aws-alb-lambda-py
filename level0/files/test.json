@@ -1,0 +1,32 @@
+{
+  "resource": "/",
+  "path": "/now",
+  "httpMethod": "GET",
+  "requestContext": {
+    "resourcePath": "/",
+    "httpMethod": "GET",
+    "path": "/now"
+  },
+  "headers": {
+    "accept": "text/html",
+    "accept-encoding": "gzip, deflate, br",
+    "Host": "xxx.us-east-2.amazonaws.com",
+    "user-agent": "Mozilla/5.0"
+  },
+  "multiValueHeaders": {
+    "accept": [
+      "text/html"
+    ],
+    "accept-encoding": [
+      "gzip, deflate, br"
+    ]
+  },
+  "queryStringParameters": {
+    "postcode": 12345
+  },
+  "multiValueQueryStringParameters": null,
+  "pathParameters": null,
+  "stageVariables": null,
+  "body": null,
+  "isBase64Encoded": false
+}

@@ -186,3 +186,5 @@ terraform.rc
 # Other
 # ------------------------------------------------------------------------------
 *.swp
+**/lambda_function.zip
+**/.terraform.lock.hcl

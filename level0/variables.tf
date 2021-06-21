@@ -14,3 +14,8 @@ variable "tags" {
     Name = "alf"
   }
 }
+
+variable "s3_access_logs" {
+  type    = string
+  default = null
+}
